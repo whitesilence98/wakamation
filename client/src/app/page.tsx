@@ -6,6 +6,7 @@ import { GameProvider, useGame } from "@/network/GameProvider";
 import { VoiceProvider, useVoice } from "@/network/VoiceProvider";
 import { DEFAULT_NAME, normalizeName } from "@game/shared/social";
 import { hexForHue, hexForId, hueOf } from "@/components/character-tint";
+import { BellPanel } from "@/components/BellActivity";
 
 const GameScene = dynamic(() => import("@/components/GameScene"), { ssr: false, loading: () => <p className="loading">Loading arena…</p> });
 
@@ -127,6 +128,7 @@ function Game() {
 
   return <main>
     <GameScene />
+    <BellPanel />
     <section className={collapsed ? "hud is-collapsed" : "hud"} aria-label="Game panel">
       <header className="hud-header">
         <div className="hud-brand">

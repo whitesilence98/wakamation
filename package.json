@@ -13,7 +13,7 @@
     "clips": "node scripts/extract-jump-clip.mjs",
     "build": "npm run build -w @game/shared && npm run build -w @game/server && npm run build -w @game/client",
     "typecheck": "npm run build -w @game/shared && npm run typecheck --workspaces --if-present",
-    "test": "npm run build -w @game/shared && tsx --test tests/movement.test.ts",
+    "test": "npm run build -w @game/shared && tsx --test tests/movement.test.ts tests/bell.test.ts tests/bell-network.test.ts",
     "test:network": "tsx --test tests/network.test.ts"
   },
   "devDependencies": {

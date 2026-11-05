@@ -2,13 +2,17 @@
 
 import { Client, type Room } from "colyseus.js";
 import type { GameState } from "@game/shared";
+import type { BellPhase, Lantern } from "@game/shared/bell";
 import type { InputMessage, PlayerSnapshot } from "@game/shared/movement";
 import { DEFAULT_COLOR, DEFAULT_NAME, normalizeColor, normalizeName } from "@game/shared/social";
 import { createContext, useContext, useEffect, useRef, useState, type MutableRefObject, type ReactNode } from "react";
 
 type ConnectionStatus = "connecting" | "connected" | "reconnecting";
-type Profile = { name: string; color: string; speaking: boolean };
+type Profile = { name: string; color: string; speaking: boolean; embers: number; lanternsLit: number };
+type BellSnapshot = { phase: BellPhase; endsAt: number; serverNow: number; receivedAt: number; charge: number; won: boolean; lanterns: Lantern[] };
 type Network = {
+  bell: BellSnapshot | null;
+  lightLantern: (id: string) => void;
   activeRoom: Room<GameState> | null;
   profiles: Map<string, Profile>;
   rename: (name: string) => boolean;
@@ -25,6 +29,7 @@ type Network = {
 const GameContext = createContext<Network | null>(null);
 
 export function GameProvider({ children }: { children: ReactNode }) {
+  const [bell, setBell] = useState<BellSnapshot | null>(null);
   const room = useRef<Room<GameState> | null>(null);
   const [activeRoom, setActiveRoom] = useState<Room<GameState> | null>(null);
   const [profiles, setProfiles] = useState(new Map<string, Profile>());
@@ -51,6 +56,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     const clear = () => {
       room.current = null;
       setActiveRoom(null);
+      setBell(null);
       setProfiles(new Map());
       snapshots.current.clear();
       revision.current++;
@@ -70,16 +76,20 @@ export function GameProvider({ children }: { children: ReactNode }) {
         // No per-tick React state: membership changes render; transforms live in refs.
         joined.onStateChange((state) => {
           if (disposed || room.current !== joined) return;
+          setBell({ phase: state.bell.phase, endsAt: state.bell.endsAt, serverNow: state.bell.updatedAt,
+            receivedAt: performance.now(), charge: state.bell.charge, won: state.bell.won,
+            lanterns: Array.from(state.bell.lanterns, l => ({ id: l.id, x: l.x, z: l.z, litUntil: l.litUntil })) });
           const next = new Map<string, PlayerSnapshot>();
           state.players.forEach((p, id) => next.set(id, {
             x: p.x, y: p.y, z: p.z, vy: p.vy, rotation: p.rotation,
             currentAnimation: p.currentAnimation, lastProcessedSeq: p.lastProcessedSeq,
           }));
           const metadata = new Map<string, Profile>();
-          state.players.forEach((p, id) => metadata.set(id, { name: p.name || DEFAULT_NAME, color: normalizeColor(p.color), speaking: p.speaking === true }));
+          state.players.forEach((p, id) => metadata.set(id, { name: p.name || DEFAULT_NAME, color: normalizeColor(p.color), speaking: p.speaking === true, embers: p.embers, lanternsLit: p.lanternsLit }));
           setProfiles(previous => previous.size === metadata.size && [...metadata].every(([id, p]) => {
             const old = previous.get(id);
-            return old?.name === p.name && old.color === p.color && old.speaking === p.speaking;
+            return old?.name === p.name && old.color === p.color && old.speaking === p.speaking
+              && old.embers === p.embers && old.lanternsLit === p.lanternsLit;
           }) ? previous : metadata);
           snapshots.current = next;
           revision.current++;
@@ -132,7 +142,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
     active.send("recolor", chosenColor.current);
     return true;
   };
-  return <GameContext.Provider value={{ activeRoom, profiles, rename, recolor, room, snapshots, revision, playerIds, sessionId, status, error, sendInput }}>{children}</GameContext.Provider>;
+  const lightLantern = (id: string) => {
+    if (room.current?.connection.isOpen) room.current.send("light-lantern", id);
+  };
+  return <GameContext.Provider value={{ bell, lightLantern, activeRoom, profiles, rename, recolor, room, snapshots, revision, playerIds, sessionId, status, error, sendInput }}>{children}</GameContext.Provider>;
 }
 
 export function useGame() {

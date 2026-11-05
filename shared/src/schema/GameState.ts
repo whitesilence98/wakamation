@@ -1,8 +1,11 @@
 import { MapSchema, Schema, type } from "@colyseus/schema";
 import { DEFAULT_COLOR, DEFAULT_NAME } from "../social.js";
 import type { AnimationName } from "../movement.js";
+import { BellState } from "./BellState.js";
 
 export class Player extends Schema {
+  @type("uint32") embers = 0;
+  @type("uint32") lanternsLit = 0;
   @type("string") name = DEFAULT_NAME;
   @type("string") color = DEFAULT_COLOR;
   @type("boolean") speaking = false;
@@ -16,5 +19,6 @@ export class Player extends Schema {
 }
 
 export class GameState extends Schema {
+  @type(BellState) bell = new BellState();
   @type({ map: Player }) players = new MapSchema<Player>();
 }

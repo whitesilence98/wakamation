@@ -10,6 +10,7 @@ import { useGame } from "@/network/GameProvider";
 import { LocalCharacter } from "./LocalCharacter";
 import { RemoteCharacter } from "./RemoteCharacter";
 import { VoiceSpatialAudio } from "./VoiceSpatialAudio";
+import { BellLanterns } from "./BellActivity";
 
 function Map() {
   const { scene } = useGLTF("/models/map/map.cropped.glb");
@@ -138,6 +139,7 @@ export default function GameScene() {
     <Suspense fallback={null}>
       <Physics gravity={[0, -9.81, 0]} timeStep={1 / 60}>
         <Map />
+        <BellLanterns />
         <RigidBody type="fixed" colliders={false}>
           {/* Floor proxy sits under the board surface the players stand on. */}
           <CuboidCollider args={[WORLD_LIMIT + 1, 0.1, WORLD_LIMIT + 1]} position={[0, GROUND_Y - 0.1, 0]} />

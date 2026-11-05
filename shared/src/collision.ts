@@ -55,13 +55,13 @@ export function resolveMove(x: number, z: number, dx: number, dz: number): { x: 
 }
 
 // Spawns are on the board's surface, so the returned y is GROUND_Y rather than 0.
-export function findSpawn(taken: readonly { x: number; z: number }[], index = taken.length): { x: number; y: number; z: number } {
+export function findSpawn(taken: readonly { x: number; z: number }[], index = taken.length, spacing = 1.2): { x: number; y: number; z: number } {
   for (let radius = 0; radius <= GRID_HALF - PLAYER_RADIUS; radius += 0.25) {
     const samples = Math.max(1, Math.ceil(2 * Math.PI * radius / 0.25));
     for (let i = 0; i < samples; i++) {
       const angle = index * 2.4 + i * 2 * Math.PI / samples;
       const x = Math.cos(angle) * radius, z = Math.sin(angle) * radius;
-      if (canStand(x, z) && taken.every(p => Math.hypot(p.x - x, p.z - z) >= 1.2)) return { x, y: GROUND_Y, z };
+      if (canStand(x, z) && taken.every(p => Math.hypot(p.x - x, p.z - z) >= spacing)) return { x, y: GROUND_Y, z };
     }
   }
   throw new Error("No clear map spawn available");

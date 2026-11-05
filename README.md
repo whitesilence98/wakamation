@@ -31,6 +31,18 @@ shared/src/
   movement.ts                    # inputs, validation, deterministic movement
 ```
 
+## Ember Harbor prototype: The Bell
+
+The first gameplay slice is a cooperative lantern festival, independent of the placeholder assets.
+
+- First gathering starts 60 seconds after the room is created; a 10-second countdown precedes each 90-second round.
+- Four marked lanterns spawn on walkable ground near the center. Approach an unlit lantern, press **E** or the on-screen button. Each flame lasts 12 seconds.
+- Together, accumulate **120 lantern-seconds** before time runs out. Several lit lanterns contribute simultaneously.
+- Contributors earn 5 Embers plus 2 per lighting, with a 10-Ember success bonus. Results last 15 seconds before the next cycle.
+- Server validates range, ground height, timing, rate limits, and duplicate requests. Client cannot submit scores or rewards.
+
+**Prototype limits:** Embers exist only for the current connection; reconnecting resets them. No persistence, fishing, housing, opt-in lobby, original harbor map, or 50-player scaling yet. The short event cadence is for playtesting.
+
 ## Share for a quick test
 
 Install cloudflared on Windows (already installed on this development machine):
@@ -58,7 +70,7 @@ Both ports need exclusive use. If a port is busy, the launcher reports listener 
 ## Verify
 
 ```sh
-npm test                         # pure movement + input validation
+npm test                         # movement + Bell logic + self-contained two-client Bell integration
 npx tsx tests/model-check.mts      # model size, bone animation, Idle hold, jump clip binding
 npm run typecheck
 npm run build

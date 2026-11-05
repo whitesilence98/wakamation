@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Room, type Client } from "@colyseus/core";
 import { GameState, GROUND_Y, Player, TICK_DT, TICK_MS, MAX_PENDING_INPUTS, findSpawn, isInput, stepPlayer, stepVertical, type InputMessage } from "@game/shared";
+import { advanceBell, bellReward, BELL_WAIT_MS, LanternState, lightLantern } from "@game/shared";
 import { isRecord, isVoiceSignal, normalizeColor, normalizeName, pairVoicePeers, speakingExpired, VOICE_ENTER_RANGE, type VoiceEdge } from "@game/shared/social";
 
 type Inbox = { inputs: InputMessage[]; lastSeq: number; windowStart: number; count: number };
@@ -41,8 +42,41 @@ export class GameRoom extends Room<GameState> {
     }
   }
 
+  private tickBell(now: number) {
+    const previous = this.state.bell.phase;
+    if (advanceBell(this.state.bell, now)) {
+      for (const player of this.state.players.values()) {
+        player.embers += bellReward(player.lanternsLit, this.state.bell.won);
+      }
+    }
+    if (previous !== "active" && this.state.bell.phase === "active") {
+      for (const player of this.state.players.values()) player.lanternsLit = 0;
+    }
+  }
+
   onCreate() {
     this.state = new GameState();
+    this.state.bell.updatedAt = Date.now();
+    this.state.bell.endsAt = Date.now() + BELL_WAIT_MS;
+    const spots: { x: number; z: number }[] = [];
+    for (let i = 0; i < 4; i++) {
+      const spot = findSpawn(spots, i, 6);
+      spots.push(spot);
+      const lantern = new LanternState();
+      lantern.id = `lantern-${i + 1}`;
+      lantern.x = spot.x;
+      lantern.z = spot.z;
+      this.state.bell.lanterns.push(lantern);
+    }
+    this.onMessage("light-lantern", (client, value: unknown) => {
+      if (typeof value !== "string" || value.length > 32 || !this.allow(client.sessionId, "lantern", 4, 4)) return;
+      const player = this.state.players.get(client.sessionId);
+      const lantern = this.state.bell.lanterns.find(l => l.id === value);
+      const now = Date.now();
+      // Account for elapsed charge before changing a lantern's expiry.
+      this.tickBell(now);
+      if (player && lantern && lightLantern(this.state.bell, lantern, player, now)) player.lanternsLit++;
+    });
     this.patchRate = TICK_MS;
     this.onMessage("rename", (client, value: unknown) => {
       if (!this.allow(client.sessionId, "rename", 1, 1)) return;
@@ -99,6 +133,7 @@ export class GameRoom extends Room<GameState> {
       inbox.inputs.push(message);
     });
     this.setSimulationInterval(() => {
+      this.tickBell(Date.now());
       for (const [id, player] of this.state.players) {
         const input = this.inboxes.get(id)?.inputs.shift();
         if (input) { stepPlayer(player, input, TICK_DT); player.lastProcessedSeq = input.seq; }
