@@ -16,7 +16,7 @@ const httpServer = createServer((req, res) => {
 const server = new Server({
   transport: new WebSocketTransport({
     server: httpServer,
-    maxPayload: 4096,
+    maxPayload: 32768,
     verifyClient: ({ origin }: { origin: string }) => allowed(origin),
   }),
 });

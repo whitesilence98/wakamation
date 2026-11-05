@@ -9,6 +9,8 @@
   "scripts": {
     "dev": "npm run build -w @game/shared && concurrently -k -n shared,server,client \"npm run dev -w @game/shared\" \"npm run dev -w @game/server\" \"npm run dev -w @game/client\"",
     "share": "node scripts/share.mjs",
+    "share:build": "node scripts/share-build.mjs",
+    "clips": "node scripts/extract-jump-clip.mjs",
     "build": "npm run build -w @game/shared && npm run build -w @game/server && npm run build -w @game/client",
     "typecheck": "npm run build -w @game/shared && npm run typecheck --workspaces --if-present",
     "test": "npm run build -w @game/shared && tsx --test tests/movement.test.ts",

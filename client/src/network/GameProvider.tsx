@@ -3,10 +3,16 @@
 import { Client, type Room } from "colyseus.js";
 import type { GameState } from "@game/shared";
 import type { InputMessage, PlayerSnapshot } from "@game/shared/movement";
+import { DEFAULT_COLOR, DEFAULT_NAME, normalizeColor, normalizeName } from "@game/shared/social";
 import { createContext, useContext, useEffect, useRef, useState, type MutableRefObject, type ReactNode } from "react";
 
 type ConnectionStatus = "connecting" | "connected" | "reconnecting";
+type Profile = { name: string; color: string; speaking: boolean };
 type Network = {
+  activeRoom: Room<GameState> | null;
+  profiles: Map<string, Profile>;
+  rename: (name: string) => boolean;
+  recolor: (color: string) => boolean;
   room: MutableRefObject<Room<GameState> | null>;
   snapshots: MutableRefObject<Map<string, PlayerSnapshot>>;
   revision: MutableRefObject<number>;
@@ -20,6 +26,10 @@ const GameContext = createContext<Network | null>(null);
 
 export function GameProvider({ children }: { children: ReactNode }) {
   const room = useRef<Room<GameState> | null>(null);
+  const [activeRoom, setActiveRoom] = useState<Room<GameState> | null>(null);
+  const [profiles, setProfiles] = useState(new Map<string, Profile>());
+  const chosenName = useRef(DEFAULT_NAME);
+  const chosenColor = useRef(DEFAULT_COLOR);
   const snapshots = useRef(new Map<string, PlayerSnapshot>());
   const revision = useRef(0);
   const [playerIds, setPlayerIds] = useState<string[]>([]);
@@ -40,6 +50,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
     };
     const clear = () => {
       room.current = null;
+      setActiveRoom(null);
+      setProfiles(new Map());
       snapshots.current.clear();
       revision.current++;
       setPlayerIds([]);
@@ -47,9 +59,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
     };
     const connect = async () => {
       try {
-        const joined = await client.joinOrCreate<GameState>("game");
+        const joined = await client.joinOrCreate<GameState>("game", { name: chosenName.current, color: chosenColor.current });
         if (disposed) { void joined.leave(); return; }
         room.current = joined;
+        setActiveRoom(joined);
         attempts = 0;
         setSessionId(joined.sessionId);
         setStatus("connected");
@@ -59,9 +72,15 @@ export function GameProvider({ children }: { children: ReactNode }) {
           if (disposed || room.current !== joined) return;
           const next = new Map<string, PlayerSnapshot>();
           state.players.forEach((p, id) => next.set(id, {
-            x: p.x, y: p.y, z: p.z, rotation: p.rotation,
+            x: p.x, y: p.y, z: p.z, vy: p.vy, rotation: p.rotation,
             currentAnimation: p.currentAnimation, lastProcessedSeq: p.lastProcessedSeq,
           }));
+          const metadata = new Map<string, Profile>();
+          state.players.forEach((p, id) => metadata.set(id, { name: p.name || DEFAULT_NAME, color: normalizeColor(p.color), speaking: p.speaking === true }));
+          setProfiles(previous => previous.size === metadata.size && [...metadata].every(([id, p]) => {
+            const old = previous.get(id);
+            return old?.name === p.name && old.color === p.color && old.speaking === p.speaking;
+          }) ? previous : metadata);
           snapshots.current = next;
           revision.current++;
           const ids = [...next.keys()];
@@ -99,7 +118,21 @@ export function GameProvider({ children }: { children: ReactNode }) {
     active.send("input", input);
     return true;
   };
-  return <GameContext.Provider value={{ room, snapshots, revision, playerIds, sessionId, status, error, sendInput }}>{children}</GameContext.Provider>;
+  const rename = (name: string) => {
+    const active = room.current;
+    if (!active?.connection.isOpen) return false;
+    chosenName.current = normalizeName(name);
+    active.send("rename", chosenName.current);
+    return true;
+  };
+  const recolor = (color: string) => {
+    const active = room.current;
+    if (!active?.connection.isOpen) return false;
+    chosenColor.current = normalizeColor(color);
+    active.send("recolor", chosenColor.current);
+    return true;
+  };
+  return <GameContext.Provider value={{ activeRoom, profiles, rename, recolor, room, snapshots, revision, playerIds, sessionId, status, error, sendInput }}>{children}</GameContext.Provider>;
 }
 
 export function useGame() {

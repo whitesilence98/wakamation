@@ -21,6 +21,7 @@ async function load(path: string) {
 }
 const gltf = await load("../client/public/models/character.glb");
 const run = await load("../client/public/models/clips/run.glb");
+const jump = await load("../client/public/models/clips/jump.glb");
 const model = clone(gltf.scene);
 const before = new Box3().setFromObject(model).getSize(new Vector3()).y;
 model.updateMatrixWorld(true);
@@ -41,8 +42,8 @@ model.updateMatrixWorld(true);
 const actual = new Box3().setFromObject(model).getSize(new Vector3()).y;
 assert.ok(Math.abs(actual - CHARACTER_HEIGHT) < 0.01, `Expected ${CHARACTER_HEIGHT}-unit character; got ${actual}`);
 
-const clips = locomotionClips(gltf.animations, run.animations);
-assert.deepEqual(clips.map(clip => clip.name), ["Idle", "Walk", "Run"]);
+const clips = locomotionClips(gltf.animations, run.animations, jump.animations);
+assert.deepEqual(clips.map(clip => clip.name), ["Idle", "Walk", "Run", "Jump"]);
 assert.deepEqual(locomotionClips(gltf.animations).map(clip => clip.name), ["Idle", "Walk"]);
 const bones: import("three").Bone[] = [];
 model.traverse(object => { if (object.type === "Bone") bones.push(object as import("three").Bone); });
@@ -62,5 +63,14 @@ for (const clip of clips) {
   assert.ok(clip.name === "Idle" ? change < 1e-6 : change > 0.01, `${clip.name} pose change: ${change}`);
 }
 assert.ok(other.getObjectByName("LeftLeg")!.quaternion.equals(untouched), "Avatar skeletons must be independent");
+// The jump's source clip has baked root drift; the extractor pins Hips X/Z to rest
+// so the avatar jumps in place. Losing that pin shows up as horizontal sliding.
+const jumpTrack = clips.find(clip => clip.name === "Jump")!.tracks.find(track => /Hips\.position$/.test(track.name))!;
+const first = [...jumpTrack.values.slice(0, 3)];
+let drift = 0;
+for (let i = 0; i < jumpTrack.values.length; i += 3) {
+  drift = Math.max(drift, Math.abs(jumpTrack.values[i]! - first[0]!), Math.abs(jumpTrack.values[i + 2]! - first[2]!));
+}
+assert.ok(drift < 1e-5, `Jump Hips X/Z must stay pinned; drifted ${drift}`);
 mixer.stopAllAction();
-console.log("Idle holds; Walk/Run animate matching bones; independent clones verified.");
+console.log(`Idle holds; Walk/Run animate matching bones; Jump binds and stays in place (${drift.toExponential(1)} drift); independent clones verified.`);

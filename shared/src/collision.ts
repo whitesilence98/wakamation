@@ -1,6 +1,14 @@
 import { COLLISION_BITS, GRID_CELL, GRID_HALF, GRID_SIZE } from "./collision-data.js";
 
 export const PLAYER_RADIUS = 0.35;
+// The map is a child's bedroom seen from toy scale, and the arena is the top of
+// the giant checkerboard board the toys stand on. The room floor is MAP_FLOOR_Y
+// in the asset, which the renderer lifts to y = 0, so the board is ~91 units up:
+// players walk on the board, not the floor. Measured from map.cropped.glb, the
+// board arches from 87.8 at its edges to 91.1 at its centre; GROUND_Y is its
+// height at the spawn point. A single constant is exact only while movement
+// stays flat — the arch itself is not modelled.
+export const GROUND_Y = 91.1;
 const bits = Uint8Array.from(atob(COLLISION_BITS), char => char.charCodeAt(0));
 const cell = (value: number) => Math.floor((value + GRID_HALF) / GRID_CELL);
 const edge = (index: number) => index * GRID_CELL - GRID_HALF;
@@ -37,7 +45,8 @@ function slide(start: number, other: number, delta: number, alongX: boolean): nu
   return end;
 }
 
-// ponytail: horizontal grid approximation; add shared terrain heights for slopes/jumping.
+// ponytail: horizontal grid approximation; the mask has no heights, so jumps are
+// purely vertical and cannot clear a blocked cell. Add shared terrain heights for slopes.
 export function resolveMove(x: number, z: number, dx: number, dz: number): { x: number; z: number } {
   if (!canStand(x, z) || !Number.isFinite(dx) || !Number.isFinite(dz)) return { x, z };
   const nextX = slide(x, z, dx, true);
@@ -45,13 +54,14 @@ export function resolveMove(x: number, z: number, dx: number, dz: number): { x: 
   return canStand(nextX, nextZ) ? { x: nextX, z: nextZ } : { x, z };
 }
 
-export function findSpawn(taken: readonly { x: number; z: number }[], index = taken.length): { x: number; z: number } {
+// Spawns are on the board's surface, so the returned y is GROUND_Y rather than 0.
+export function findSpawn(taken: readonly { x: number; z: number }[], index = taken.length): { x: number; y: number; z: number } {
   for (let radius = 0; radius <= GRID_HALF - PLAYER_RADIUS; radius += 0.25) {
     const samples = Math.max(1, Math.ceil(2 * Math.PI * radius / 0.25));
     for (let i = 0; i < samples; i++) {
       const angle = index * 2.4 + i * 2 * Math.PI / samples;
       const x = Math.cos(angle) * radius, z = Math.sin(angle) * radius;
-      if (canStand(x, z) && taken.every(p => Math.hypot(p.x - x, p.z - z) >= 1.2)) return { x, z };
+      if (canStand(x, z) && taken.every(p => Math.hypot(p.x - x, p.z - z) >= 1.2)) return { x, y: GROUND_Y, z };
     }
   }
   throw new Error("No clear map spawn available");
