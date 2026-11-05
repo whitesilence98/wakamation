@@ -1,0 +1,5 @@
+{
+  "name": "@game/server", "version": "0.1.0", "private": true, "type": "module",
+  "scripts": { "dev": "tsx watch src/index.ts", "build": "tsc -p tsconfig.json", "start": "node dist/index.js", "typecheck": "tsc -p tsconfig.json --noEmit" },
+  "dependencies": { "@game/shared": "0.1.0", "@colyseus/core": "0.16.26", "@colyseus/ws-transport": "0.16.5" }
+}

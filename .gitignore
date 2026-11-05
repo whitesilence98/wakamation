@@ -1,0 +1,31 @@
+node_modules/
+dist/
+.next/
+*.tsbuildinfo
+*.log
+.env*
+!.env.example
+playwright-report/
+test-results/
+tests/screenshots/
+
+# Downloaded source assets and large binary models (keep locally).
+/assets-source/
+*.glb
+*.gltf
+*.blend
+*.fbx
+*.obj
+*.zip
+*.7z
+*.rar
+
+# Generated output and local editor/OS files.
+coverage/
+out/
+.vercel/
+.claude/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

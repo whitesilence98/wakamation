@@ -1,0 +1,11 @@
+:root { color-scheme: dark; --background: #101c2b; --text: #edf5fa; --muted: #a5bac7; --panel: #101c2be8; --border: #355267; --error: #ffb8ae; }
+* { box-sizing: border-box; }
+html, body, main { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+canvas { touch-action: none; }
+body { background: var(--background); color: var(--text); font-family: system-ui, sans-serif; }
+.hud { position: absolute; top: 16px; left: 16px; width: min(360px, calc(100% - 32px)); padding: 18px 22px; border: 1px solid var(--border); border-radius: 12px; background: var(--panel); pointer-events: none; }
+h1 { margin: 0 0 10px; font-size: 24px; letter-spacing: -.04em; }
+p { margin: 8px 0; line-height: 1.5; font-size: 14px; }
+.muted { color: var(--muted); }
+.error { color: var(--error); overflow-wrap: anywhere; }
+.loading { position: absolute; top: 50%; width: 100%; text-align: center; }

@@ -1,0 +1,7 @@
+{$APP_HOST} {
+  reverse_proxy web:3000
+}
+
+{$GAME_HOST} {
+  reverse_proxy game:2567
+}
