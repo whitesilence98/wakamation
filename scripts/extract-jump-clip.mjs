@@ -1,4 +1,4 @@
-// Builds client/public/models/clips/jump.glb from assets-source/attack.glb.
+// Builds client/public/models/characters/axolot/clips/jump.glb from assets-source/attack.glb.
 //
 // The carrier (assets-source/walking-armature.glb) is a 64 KB armature-only
 // export: same 24-joint rig, same bone names and inverse bind matrices as
@@ -19,7 +19,7 @@ import { readFile, writeFile } from "node:fs/promises";
 
 const CARRIER = new URL("../assets-source/walking-armature.glb", import.meta.url);
 const SOURCE = new URL("../assets-source/attack.glb", import.meta.url);
-const TARGET = new URL("../client/public/models/clips/jump.glb", import.meta.url);
+const TARGET = new URL("../client/public/models/characters/axolot/clips/jump.glb", import.meta.url);
 const CLIP_NAME = "Jump";
 
 function readGlb(bytes) {

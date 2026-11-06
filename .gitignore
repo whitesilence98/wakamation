@@ -11,6 +11,8 @@ tests/screenshots/
 
 # Downloaded source assets and large binary models (keep locally).
 /assets-source/
+/client/public/models/forest/
+/client/public/models/characters/gawr/
 *.glb
 *.gltf
 *.blend

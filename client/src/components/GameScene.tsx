@@ -2,49 +2,63 @@
 
 import { Suspense, useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { Physics, RigidBody, CuboidCollider } from "@react-three/rapier";
 import { useGLTF } from "@react-three/drei";
-import { GROUND_Y, MAP_FLOOR_Y, WORLD_LIMIT } from "@game/shared/movement";
-import { DirectionalLight, Vector3 } from "three";
+import { Physics, RigidBody, CuboidCollider } from "@react-three/rapier";
+import { GROUND_Y, WORLD_LIMIT } from "@game/shared/movement";
+import { Box3, DirectionalLight, Vector3 } from "three";
 import { useGame } from "@/network/GameProvider";
 import { LocalCharacter } from "./LocalCharacter";
 import { RemoteCharacter } from "./RemoteCharacter";
 import { VoiceSpatialAudio } from "./VoiceSpatialAudio";
-import { BellLanterns } from "./BellActivity";
+import { Forest } from "./Forest";
+import type { GraphicsSettings } from "./graphics-settings";
 
-function Map() {
-  const { scene } = useGLTF("/models/map/map.cropped.glb");
-  // The asset's room floor sits at MAP_FLOOR_Y; lift it so the room floor is y = 0.
-  // Players walk on the board above it at GROUND_Y, which this leaves in place.
-  // ponytail: shared collision grid handles horizontal movement; jumps are purely
-  // vertical. Add shared terrain heights before slopes or landing on props.
-  return <primitive object={scene} position={[0, -MAP_FLOOR_Y, 0]} />;
+function House() {
+  const { scene } = useGLTF("/models/house/house.glb");
+  const { model, scale, position } = useMemo(() => {
+    const model = scene.clone(true);
+    model.updateMatrixWorld(true);
+    const bounds = new Box3().setFromObject(model);
+    const size = bounds.getSize(new Vector3());
+    const center = bounds.getCenter(new Vector3());
+    const width = Math.max(size.x, size.z);
+    if (!Number.isFinite(width) || width <= 0 || !Number.isFinite(bounds.min.y)) throw new Error("House has invalid bounds");
+    const scale = 10 / width;
+    return { model, scale, position: [-center.x * scale, GROUND_Y - bounds.min.y * scale, -center.z * scale] as [number, number, number] };
+  }, [scene]);
+  // ponytail: visual-only placement; add shared collision and safe spawns before making it solid.
+  return <group scale={scale} position={position}><primitive object={model} dispose={null} /></group>;
 }
 
-/**
- * Key light for the board. Built imperatively because a DirectionalLight aims at
- * its `target`, which R3F does not mount into the scene: the light's own target
- * would stay at the world origin below the board, aiming shadows away from it.
- * The shadow camera is centred on the board for the same reason.
- */
-function Sun() {
+function ViewDistance({ distance }: { distance: number }) {
+  const camera = useThree(state => state.camera);
+  useEffect(() => {
+    camera.far = distance + 20;
+    camera.updateProjectionMatrix();
+  }, [camera, distance]);
+  return null;
+}
+
+/** Aim the key light at the forest clearing, not the light's default target. */
+function Sun({ shadows }: { shadows: boolean }) {
   const light = useMemo(() => {
-    const light = new DirectionalLight(0xffffff, 2.2);
-    light.position.set(8, GROUND_Y + 18, 10);
+    const light = new DirectionalLight(0xffebc4, 2.6);
+    light.position.set(18, GROUND_Y + 32, 12);
     light.castShadow = true;
     light.shadow.mapSize.set(1024, 1024);
+    light.shadow.normalBias = 0.05;
     const camera = light.shadow.camera;
-    camera.left = -28;
-    camera.right = 28;
-    camera.top = 28;
-    camera.bottom = -28;
-    camera.far = 70;
+    camera.left = -WORLD_LIMIT - 8;
+    camera.right = WORLD_LIMIT + 8;
+    camera.top = WORLD_LIMIT + 8;
+    camera.bottom = -WORLD_LIMIT - 8;
+    camera.far = 120;
     camera.updateProjectionMatrix();
     light.target.position.set(0, GROUND_Y, 0);
     light.target.updateMatrixWorld();
     return light;
   }, []);
-  return <primitive object={light} />;
+  return <primitive object={light} castShadow={shadows} />;
 }
 
 function FollowCamera({ target }: { target: MutableRefObject<Vector3> }) {
@@ -103,9 +117,7 @@ function FollowCamera({ target }: { target: MutableRefObject<Vector3> }) {
     };
   }, [canvas]);
   useFrame(({ camera }, dt) => {
-    // Horizontal smoothing is deliberately soft. Height is copied exactly: the
-    // jump arc peaks at ~150 u/s, and any exponential gain would lag it by
-    // units/s, throwing the avatar out of a frame only ~3 units tall.
+    // Follow the smoothed avatar height without adding a second vertical lag.
     const horizontalAlpha = 1 - Math.exp(-10 * dt);
     anchor.current.x += (target.current.x - anchor.current.x) * horizontalAlpha;
     anchor.current.z += (target.current.z - anchor.current.z) * horizontalAlpha;
@@ -121,7 +133,15 @@ function FollowCamera({ target }: { target: MutableRefObject<Vector3> }) {
   return null;
 }
 
-export default function GameScene() {
+export default function GameScene({ graphics }: { graphics: GraphicsSettings }) {
+  const [deviceDpr, setDeviceDpr] = useState(1);
+  useEffect(() => {
+    const update = () => setDeviceDpr(Math.max(1, Math.min(window.devicePixelRatio || 1, 2)));
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+  const dpr = graphics.resolution === "performance" ? 0.75 : graphics.resolution === "hd" ? deviceDpr : 1;
   const { playerIds, sessionId, status, error } = useGame();
   const [readySession, setReadySession] = useState<string | null>(null);
   const ready = !!sessionId && readySession === sessionId && playerIds.includes(sessionId);
@@ -130,18 +150,18 @@ export default function GameScene() {
     {!ready && <div role="status" aria-live="polite" style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", background: "var(--background)" }}>
       {error || (status === "connected" ? "Loading character…" : `${status}…`)}
     </div>}
-    <Canvas style={{ visibility: ready ? "visible" : "hidden" }} shadows dpr={[1, 1.5]} camera={{ position: [0, GROUND_Y + 2.5, -5.2], fov: 55 }}>
-    <color attach="background" args={["#101c2b"]} />
-    {/* Fog is measured from the camera, so its range is independent of GROUND_Y. */}
-    <fog attach="fog" args={["#101c2b", 60, 85]} />
-    <ambientLight intensity={1.2} />
-    <Sun />
+    <Canvas style={{ visibility: ready ? "visible" : "hidden" }} shadows dpr={dpr} camera={{ position: [0, GROUND_Y + 2.5, -5.2], fov: 55 }}>
+    <color attach="background" args={["#bdcfb3"]} />
+    <fog attach="fog" args={["#bdcfb3", graphics.viewDistance * 26 / 54, graphics.viewDistance]} />
+    <hemisphereLight args={["#deebff", "#52633c", 1.5]} />
+    <Sun shadows={graphics.shadows} />
+    <ViewDistance distance={graphics.viewDistance} />
     <Suspense fallback={null}>
       <Physics gravity={[0, -9.81, 0]} timeStep={1 / 60}>
-        <Map />
-        <BellLanterns />
+        <Forest graphics={graphics} />
+        <Suspense fallback={null}><House /></Suspense>
         <RigidBody type="fixed" colliders={false}>
-          {/* Floor proxy sits under the board surface the players stand on. */}
+          {/* Shared movement owns collision; this proxy sits under forest ground. */}
           <CuboidCollider args={[WORLD_LIMIT + 1, 0.1, WORLD_LIMIT + 1]} position={[0, GROUND_Y - 0.1, 0]} />
         </RigidBody>
         {sessionId && playerIds.includes(sessionId) && <LocalCharacter key={sessionId} cameraTarget={target} onReady={() => setReadySession(sessionId)} />}

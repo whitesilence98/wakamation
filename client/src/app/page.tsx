@@ -4,14 +4,15 @@ import dynamic from "next/dynamic";
 import { useEffect, useRef, useState, type SyntheticEvent } from "react";
 import { GameProvider, useGame } from "@/network/GameProvider";
 import { VoiceProvider, useVoice } from "@/network/VoiceProvider";
-import { DEFAULT_NAME, normalizeName } from "@game/shared/social";
+import { CHARACTER_IDS, DEFAULT_CHARACTER, DEFAULT_NAME, isCharacter, normalizeName } from "@game/shared/social";
 import { hexForHue, hexForId, hueOf } from "@/components/character-tint";
-import { BellPanel } from "@/components/BellActivity";
+import { GraphicsSettings } from "@/components/GraphicsSettings";
+import { DEFAULT_GRAPHICS, GRAPHICS_STORAGE_KEY, normalizeGraphics } from "@/components/graphics-settings";
 
 const GameScene = dynamic(() => import("@/components/GameScene"), { ssr: false, loading: () => <p className="loading">Loading arena…</p> });
 
 function Game() {
-  const { status, error, playerIds, profiles, sessionId, rename, recolor } = useGame();
+  const { status, error, playerIds, profiles, sessionId, rename, recolor, selectCharacter, characterError } = useGame();
   const voice = useVoice();
   const currentName = sessionId ? profiles.get(sessionId)?.name : undefined;
   const currentColor = sessionId ? profiles.get(sessionId)?.color : undefined;
@@ -20,6 +21,21 @@ function Game() {
   const [color, setColor] = useState("#38bdf8");
   const [hue, setHue] = useState(0);
   const [collapsed, setCollapsed] = useState(false);
+  const [graphicsOpen, setGraphicsOpen] = useState(false);
+  const [graphics, setGraphics] = useState(DEFAULT_GRAPHICS);
+  const [graphicsLoaded, setGraphicsLoaded] = useState(false);
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem(GRAPHICS_STORAGE_KEY) ?? "null");
+      if (stored?.version === 1) setGraphics(normalizeGraphics(stored.settings));
+    } catch { /* unavailable or malformed storage: keep defaults */ }
+    setGraphicsLoaded(true);
+  }, []);
+  useEffect(() => {
+    if (!graphicsLoaded) return;
+    try { localStorage.setItem(GRAPHICS_STORAGE_KEY, JSON.stringify({ version: 1, settings: graphics })); }
+    catch { /* preferences still work without storage */ }
+  }, [graphics, graphicsLoaded]);
   const sentName = useRef<string | null>(null);
   const profileColor = useRef("");
   // The wire value the server currently holds: "" while a colour is unset.
@@ -127,8 +143,8 @@ function Game() {
     : voice.status === "requesting" ? "Waiting for microphone permission" : "Microphone off";
 
   return <main>
-    <GameScene />
-    <BellPanel />
+    <GameScene graphics={graphics} />
+    <GraphicsSettings open={graphicsOpen} settings={graphics} onChange={setGraphics} onClose={() => setGraphicsOpen(false)} />
     <section className={collapsed ? "hud is-collapsed" : "hud"} aria-label="Game panel">
       <header className="hud-header">
         <div className="hud-brand">
@@ -165,6 +181,15 @@ function Game() {
 
         <section className="hud-section">
           <h2 className="section-label">Customization</h2>
+          <label className="field-label" htmlFor="player-character">Character</label>
+          <div className="field">
+            <select id="player-character" value={(sessionId && profiles.get(sessionId)?.character) || DEFAULT_CHARACTER}
+              disabled={status !== "connected"} aria-describedby="character-hint"
+              onChange={event => { if (isCharacter(event.target.value)) selectCharacter(event.target.value); }}>
+              {CHARACTER_IDS.map(id => <option key={id} value={id}>{id === "gawr" ? "Gawr" : "Axolot"}</option>)}
+            </select>
+          </div>
+          <span id="character-hint" className="field-hint" aria-live="polite">{characterError ?? ""}</span>
           <div className="field-row">
             <span className="field-label">Hue Tint</span>
             <button type="button" className="pill" onClick={useDefaultColor} disabled={status !== "connected"}>Use default</button>
@@ -246,20 +271,21 @@ function Game() {
         {error && <p role="alert" className="error small">{error}</p>}
       </div>
     </section>
-    <div className="hud-actions" aria-hidden="true">
-      <span className="icon-button">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+    <div className="hud-actions">
+      <button type="button" className="icon-button settings-button" aria-label="Graphics settings" aria-haspopup="dialog"
+        aria-expanded={graphicsOpen} aria-controls="graphics-settings" onClick={() => setGraphicsOpen(true)}>
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="12" cy="12" r="3.2" />
           <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" />
         </svg>
-      </span>
-      <span className="icon-button">
+      </button>
+      <span className="icon-button decorative-action" aria-hidden="true">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
           <path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3z" />
           <path d="M9 3v15M15 6v15" />
         </svg>
       </span>
-      <span className="icon-button">
+      <span className="icon-button decorative-action" aria-hidden="true">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="12" cy="12" r="9" />
           <path d="M9.2 9a3 3 0 1 1 4.5 2.7c-.9.5-1.7 1.1-1.7 2.1" />

@@ -6,7 +6,8 @@ import { useFrame } from "@react-three/fiber";
 import { Box3, Group, LoopOnce, LoopRepeat, Vector3, type AnimationAction, type AnimationClip, type SkinnedMesh } from "three";
 import { clone } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { AIR_TIME, type AnimationName } from "@game/shared/movement";
-import { JUMP_CLIP, locomotionClips } from "./character-clips";
+import { DEFAULT_CHARACTER, type CharacterId } from "@game/shared/social";
+import { locomotionClips } from "./character-clips";
 import { CHARACTER_HEIGHT, GAIT_SCALE } from "./character-size";
 import { applyTint, disposeTint, setTintHue, tintColor } from "./character-tint";
 
@@ -25,14 +26,7 @@ function Capsule({ color }: { color: string }) {
 }
 
 function RunClips({ onLoad }: { onLoad: (clips: AnimationClip[]) => void }) {
-  const { animations } = useGLTF("/models/clips/run.glb");
-  useEffect(() => onLoad(animations), [animations, onLoad]);
-  return null;
-}
-
-// Separate file so the jump animation can be swapped without touching the loader.
-function JumpClips({ onLoad }: { onLoad: (clips: AnimationClip[]) => void }) {
-  const { animations } = useGLTF(`/models/clips/${JUMP_CLIP}`);
+  const { animations } = useGLTF("/models/characters/axolot/clips/run.glb");
   useEffect(() => onLoad(animations), [animations, onLoad]);
   return null;
 }
@@ -43,11 +37,10 @@ function CharacterReady({ onReady }: { onReady?: () => void }) {
   return null;
 }
 
-function Model({ animation, local, tint, onReady }: { animation: { current: AnimationName }; local: boolean; tint?: number; onReady?: () => void }) {
-  const { scene, animations } = useGLTF("/models/character.glb");
+function Model({ character, animation, local, tint, onReady }: { character: CharacterId; animation: { current: AnimationName }; local: boolean; tint?: number; onReady?: () => void }) {
+  const { scene, animations } = useGLTF(character === "gawr" ? "/models/characters/gawr/scene.gltf" : "/models/characters/axolot/axolot.glb");
   const [runClips, setRunClips] = useState<AnimationClip[]>([]);
-  const [jumpClips, setJumpClips] = useState<AnimationClip[]>([]);
-  const clips = useMemo(() => locomotionClips(animations, runClips, jumpClips), [animations, runClips, jumpClips]);
+  const clips = useMemo(() => locomotionClips(animations, runClips, character), [animations, runClips, character]);
   const root = useRef<Group>(null);
   const previous = useRef<AnimationAction | null>(null);
   const { model, scale, offset } = useMemo(() => {
@@ -76,9 +69,10 @@ function Model({ animation, local, tint, onReady }: { animation: { current: Anim
   const { actions } = useAnimations(clips, root);
   useEffect(() => { previous.current = null; }, [clips]);
   useFrame(() => {
-    const jumping = animation.current === "Jump";
-    // Without a jump clip, keep whatever is playing rather than snapping to Walk.
-    const next = actions[animation.current] ?? (jumping ? previous.current : actions.Walk);
+    const requestedJump = animation.current === "Jump";
+    const jumping = requestedJump && !!actions.Jump;
+    // ponytail: gawr has no Jump clip; retain locomotion until a matching clip exists.
+    const next = actions[animation.current] ?? (requestedJump ? previous.current ?? actions.Idle : actions.Walk);
     if (!next) return;
     // Landing always passes through Idle/Walk, so a second jump is a different
     // action than the held one-shot and starts from the top on its own.
@@ -95,10 +89,11 @@ function Model({ animation, local, tint, onReady }: { animation: { current: Anim
       const locomotion = next.getClip().name !== "Idle";
       const phase = locomotion && previousAction && /^(Walk|Run)$/.test(previousAction.getClip().name)
         ? (previousAction.time / previousAction.getClip().duration) % 1 : 0;
-      next.reset().setLoop(LoopRepeat, Infinity).setEffectiveTimeScale(locomotion ? GAIT_SCALE : 1);
+      next.reset().setLoop(LoopRepeat, Infinity).setEffectiveTimeScale(locomotion && character === "axolot" ? GAIT_SCALE : 1);
       next.time = phase * next.getClip().duration;
-      next.fadeIn(0.25).play();
-      previousAction?.fadeOut(0.25);
+      const fade = previousAction?.getClip().name === "Jump" ? 0.08 : 0.25;
+      next.fadeIn(fade).play();
+      previousAction?.fadeOut(fade);
     }
     previous.current = next;
     if (local) document.documentElement.dataset.clip = next.getClip().name;
@@ -106,13 +101,11 @@ function Model({ animation, local, tint, onReady }: { animation: { current: Anim
   return <group ref={root}>
     <CharacterReady onReady={onReady} />
     <group scale={scale} position={offset}><primitive object={model} /></group>
-    {/* Independent boundaries: a missing jump file must not take the run clip with it. */}
-    <ModelBoundary fallback={null}><Suspense fallback={null}><RunClips onLoad={setRunClips} /></Suspense></ModelBoundary>
-    <ModelBoundary fallback={null}><Suspense fallback={null}><JumpClips onLoad={setJumpClips} /></Suspense></ModelBoundary>
+    {character === "axolot" && <ModelBoundary fallback={null}><Suspense fallback={null}><RunClips onLoad={setRunClips} /></Suspense></ModelBoundary>}
   </group>;
 }
 
-export function Character({ animation, local = false, tint, onReady }: { animation: { current: AnimationName }; local?: boolean; tint?: number; onReady?: () => void }) {
+export function Character({ character = DEFAULT_CHARACTER, animation, local = false, tint, onReady }: { character?: CharacterId; animation: { current: AnimationName }; local?: boolean; tint?: number; onReady?: () => void }) {
   const fallback = <group scale={CHARACTER_HEIGHT / 1.8}><Capsule color={tint === undefined ? "#fb923c" : `#${tintColor(tint).getHexString()}`} /></group>;
-  return <ModelBoundary fallback={<>{fallback}<CharacterReady onReady={onReady} /></>}><Suspense fallback={fallback}><Model animation={animation} local={local} tint={tint} onReady={onReady} /></Suspense></ModelBoundary>;
+  return <ModelBoundary key={character} fallback={<>{fallback}<CharacterReady onReady={onReady} /></>}><Suspense fallback={fallback}><Model character={character} animation={animation} local={local} tint={tint} onReady={onReady} /></Suspense></ModelBoundary>;
 }

@@ -1,3 +1,8 @@
+export const CHARACTER_IDS = ["axolot", "gawr"] as const;
+export type CharacterId = typeof CHARACTER_IDS[number];
+export const DEFAULT_CHARACTER: CharacterId = "axolot";
+export const isCharacter = (value: unknown): value is CharacterId => value === "axolot" || value === "gawr";
+
 export const DEFAULT_COLOR = "";
 export const normalizeColor = (value: unknown): string => typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value) ? value.toLowerCase() : DEFAULT_COLOR;
 export const DEFAULT_NAME = "Gaylord";

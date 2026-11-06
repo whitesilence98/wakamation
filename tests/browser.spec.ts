@@ -4,7 +4,7 @@ for (const missing of [false, true]) {
   test(`scene waits for character ${missing ? "fallback" : "model"}`, async ({ page }) => {
     let release!: () => void;
     const gate = new Promise<void>(resolve => { release = resolve; });
-    await page.route("**/models/character.glb", async route => {
+    await page.route("**/models/characters/axolot/axolot.glb", async route => {
       await gate;
       if (missing) await route.fulfill({ status: 404, body: "Missing character" });
       else await route.continue();
@@ -26,14 +26,12 @@ test("two browser clients load the model, render and move", async ({ browser }) 
   const b = await context.newPage();
   const errors: string[] = [];
   a.on("pageerror", error => errors.push(error.message));
-  const model = a.waitForResponse(response => response.url().endsWith("/models/character.glb"));
-  const run = a.waitForResponse(response => response.url().endsWith("/models/clips/run.glb"));
-  const jump = a.waitForResponse(response => response.url().endsWith("/models/clips/jump.glb"));
+  const model = a.waitForResponse(response => response.url().endsWith("/models/characters/axolot/axolot.glb"));
+  const run = a.waitForResponse(response => response.url().endsWith("/models/characters/axolot/clips/run.glb"));
   await a.goto("http://127.0.0.1:3000");
   await expect(a.getByRole("status")).toContainText("connected", { timeout: 30_000 });
   expect((await model).status()).toBe(200);
   expect((await run).status()).toBe(200);
-  expect((await jump).status()).toBe(200);
   await expect(a.locator("html")).toHaveAttribute("data-clip", "Idle");
   await expect(a.locator("canvas")).toBeVisible();
   await b.goto("http://127.0.0.1:3000");
@@ -51,7 +49,7 @@ test("two browser clients load the model, render and move", async ({ browser }) 
   await a.waitForTimeout(350);
   await a.keyboard.up("ShiftLeft");
   await expect(a.locator("html")).toHaveAttribute("data-clip", "Walk");
-  // Space is an edge-triggered takeoff; the arc lasts ~1.25 s and lands back on Walk.
+  // Space is an edge-triggered takeoff; the short hop lands back on Walk.
   await a.keyboard.press("Space");
   await expect(a.locator("html")).toHaveAttribute("data-clip", "Jump");
   await expect(a.locator("html")).toHaveAttribute("data-clip", "Walk", { timeout: 5_000 });
@@ -64,7 +62,7 @@ test("two browser clients load the model, render and move", async ({ browser }) 
 });
 
 test("missing run clip keeps the walking model usable", async ({ page }) => {
-  await page.route("**/models/clips/run.glb", route => route.fulfill({ status: 404, body: "Missing clip" }));
+  await page.route("**/models/characters/axolot/clips/run.glb", route => route.fulfill({ status: 404, body: "Missing clip" }));
   await page.goto("http://127.0.0.1:3000");
   await expect(page.getByRole("status")).toContainText("connected", { timeout: 30_000 });
   await expect(page.locator("html")).toHaveAttribute("data-clip", "Idle");

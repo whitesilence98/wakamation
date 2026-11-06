@@ -1,7 +1,6 @@
-import { GRID_HALF, MAP_FLOOR_Y } from "./collision-data.js";
+import { GRID_HALF } from "./collision-data.js";
 import { GROUND_Y, resolveMove } from "./collision.js";
 export { canStand, findSpawn, GROUND_Y, PLAYER_RADIUS, resolveMove } from "./collision.js";
-export { MAP_FLOOR_Y } from "./collision-data.js";
 
 export const TICK_MS = 50;
 export const TICK_DT = TICK_MS / 1000;
@@ -9,27 +8,19 @@ export const WALK_SPEED = 3;
 export const RUN_SPEED = 6;
 export const WORLD_LIMIT = GRID_HALF;
 export const MAX_PENDING_INPUTS = 32;
-export const JUMP_HEIGHT = 45.5;
-// Airtime is the feel parameter, not an Earth-gravity consequence. The avatar is
-// 1.35 units tall and the map is ~91 units floor-to-ceiling, so "half the map"
-// is already a ~34-body-height leap. At real gravity it would hang in the air for
-// six seconds; deriving gravity from a short airtime keeps the arc snappy while
-// the apex stays exactly JUMP_HEIGHT.
-//   apex    = JUMP_SPEED^2 / (2 * GRAVITY) = JUMP_HEIGHT
-//   airtime = 2 * JUMP_SPEED / GRAVITY     = JUMP_AIRTIME
-export const JUMP_AIRTIME = 1.2;
+// A modest hop for the 1.35-unit avatar; shared by prediction and the server.
+export const JUMP_HEIGHT = 0.8;
+export const JUMP_AIRTIME = 0.6;
 export const GRAVITY = 8 * JUMP_HEIGHT / (JUMP_AIRTIME * JUMP_AIRTIME);
 export const JUMP_SPEED = 4 * JUMP_HEIGHT / JUMP_AIRTIME;
-// Rendering follows height exactly (a jump moves too fast to smooth) and smooths
-// only the horizontal plane, where one step is at most RUN_SPEED * TICK_DT.
-// Corrections beyond this are spawns or reconnects, not ordinary lag.
+// Larger corrections are spawns or reconnects, not ordinary movement.
 export const RENDER_SNAP_DISTANCE = 5;
 // The arc is advanced in whole TICK_DT steps, so it lands on a tick boundary
 // rather than exactly at JUMP_AIRTIME. Simulate the arc once here, with the same
 // integrator stepPlayer uses, and retime the jump clip to the real landing time.
 export const AIR_TIME = (() => {
   let y = 0, vy = JUMP_SPEED, ticks = 0;
-  do { y += vy * TICK_DT - 0.5 * GRAVITY * TICK_DT * TICK_DT; vy -= GRAVITY * TICK_DT; ticks++; } while (y > 0 && ticks < 1000);
+  do { y += vy * TICK_DT - 0.5 * GRAVITY * TICK_DT * TICK_DT; vy -= GRAVITY * TICK_DT; ticks++; } while (y > 1e-9 && ticks < 1000);
   return ticks * TICK_DT;
 })();
 export type AnimationName = "Idle" | "Walk" | "Run" | "Jump";
@@ -52,7 +43,7 @@ export function isInput(value: unknown): value is InputMessage {
  *
  * Horizontal collision is the existing 2D walkability mask, so a jump is purely
  * visual — it cannot clear a blocked cell. Vertical motion is independent: the
- * player is either on the board (y = GROUND_Y) or following a ballistic arc.
+ * player is either on the ground (y = GROUND_Y) or following a ballistic arc.
  */
 export function stepPlayer(player: Transform, input: InputMessage, dt = TICK_DT): void {
   const magnitude = Math.hypot(input.right, input.forward);
@@ -65,7 +56,7 @@ export function stepPlayer(player: Transform, input: InputMessage, dt = TICK_DT)
   }
 
   if (player.y <= GROUND_Y && input.jump) {
-    // Grounded and asked to jump: leave the board with the takeoff speed, then
+    // Grounded and asked to jump: leave the ground with the takeoff speed, then
     // integrate this step like any other airborne tick.
     player.y = GROUND_Y;
     player.vy = JUMP_SPEED;
@@ -89,7 +80,7 @@ export function stepPlayer(player: Transform, input: InputMessage, dt = TICK_DT)
 function integrateGravity(player: Transform, dt: number): void {
   player.y += player.vy * dt - 0.5 * GRAVITY * dt * dt;
   player.vy -= GRAVITY * dt;
-  if (player.y <= GROUND_Y) { player.y = GROUND_Y; player.vy = 0; }
+  if (player.y <= GROUND_Y + 1e-9) { player.y = GROUND_Y; player.vy = 0; }
 }
 
 /**

@@ -1,7 +1,7 @@
 {
   "name": "@game/shared", "version": "0.1.0", "private": true, "type": "module",
   "main": "./dist/index.js", "types": "./dist/index.d.ts",
-  "exports": { ".": "./dist/index.js", "./movement": "./dist/movement.js", "./social": "./dist/social.js", "./bell": "./dist/bell.js" },
+  "exports": { ".": "./dist/index.js", "./movement": "./dist/movement.js", "./social": "./dist/social.js", "./bell": "./dist/bell.js", "./forest": "./dist/forest.js" },
   "scripts": { "build": "tsc -p tsconfig.json", "dev": "tsc -p tsconfig.json --watch", "typecheck": "tsc -p tsconfig.json --noEmit" },
   "dependencies": { "@colyseus/schema": "3.0.76" }
 }

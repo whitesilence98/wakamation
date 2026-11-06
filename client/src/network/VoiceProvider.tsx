@@ -226,11 +226,11 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
       }
     };
     const down = (event: KeyboardEvent) => {
-      if (event.code !== "KeyV" || event.repeat || event.ctrlKey || event.metaKey || event.altKey || editable(event.target)) return;
+      if (document.querySelector("dialog[open]") || event.code !== "KeyV" || event.repeat || event.ctrlKey || event.metaKey || event.altKey || editable(event.target)) return;
       if (enabled) { event.preventDefault(); keyHeld = true; applyHold(); }
     };
     const upKey = (event: KeyboardEvent) => { if (event.code === "KeyV") { keyHeld = false; applyHold(); } };
-    const focus = (event: FocusEvent) => { if (editable(event.target)) release(); };
+    const focus = (event: FocusEvent) => { if (document.querySelector("dialog[open]") || editable(event.target)) release(); };
     const timer = window.setInterval(() => {
       if (!enabled || !analyser || !samples) return;
       const now = performance.now();

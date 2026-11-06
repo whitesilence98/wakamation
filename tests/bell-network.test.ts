@@ -17,18 +17,37 @@ async function until(check: () => boolean) {
 
 test("Bell synchronizes interactions and pays contributors exactly once", async () => {
   let authority: GameRoom;
+  let disabledAuthority: GameRoom;
+  class DisabledRoom extends GameRoom {
+    onCreate() { super.onCreate(); disabledAuthority = this; }
+  }
   class TestRoom extends GameRoom {
+    protected bellEnabled = true;
     onCreate() { super.onCreate(); authority = this; }
   }
   const http = createServer();
   const server = new Server({ transport: new WebSocketTransport({ server: http }), greet: false });
   server.define("bell-test", TestRoom);
+  server.define("bell-disabled", DisabledRoom);
   const clients: Room<GameState>[] = [];
   try {
     await server.listen(0, "127.0.0.1");
     const address = http.address();
     assert.ok(address && typeof address !== "string");
     const client = new Client(`ws://127.0.0.1:${address.port}`);
+    const disabled = await client.joinOrCreate<GameState>("bell-disabled"); clients.push(disabled);
+    await until(() => !!disabled.state.players?.has(disabled.sessionId));
+    const paused = disabledAuthority!.state.bell;
+    assert.equal(paused.lanterns.length, 0);
+    assert.equal(paused.endsAt, 0);
+    paused.phase = "active";
+    paused.endsAt = Date.now() - 1;
+    disabled.send("light-lantern", "lantern-1");
+    await new Promise(resolve => setTimeout(resolve, 150));
+    assert.equal(paused.phase, "active", "disabled Bell must not advance");
+    const idlePlayer = disabledAuthority!.state.players.get(disabled.sessionId)!;
+    assert.equal(idlePlayer.lanternsLit, 0);
+    assert.equal(idlePlayer.embers, 0);
     const a = await client.joinOrCreate<GameState>("bell-test"); clients.push(a);
     const b = await client.joinById<GameState>(a.roomId); clients.push(b);
     await until(() => !!b.state.players?.has(a.sessionId));

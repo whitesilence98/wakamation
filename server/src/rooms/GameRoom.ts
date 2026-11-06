@@ -2,13 +2,15 @@ import { randomUUID } from "node:crypto";
 import { Room, type Client } from "@colyseus/core";
 import { GameState, GROUND_Y, Player, TICK_DT, TICK_MS, MAX_PENDING_INPUTS, findSpawn, isInput, stepPlayer, stepVertical, type InputMessage } from "@game/shared";
 import { advanceBell, bellReward, BELL_WAIT_MS, LanternState, lightLantern } from "@game/shared";
-import { isRecord, isVoiceSignal, normalizeColor, normalizeName, pairVoicePeers, speakingExpired, VOICE_ENTER_RANGE, type VoiceEdge } from "@game/shared/social";
+import { isCharacter, isRecord, isVoiceSignal, normalizeColor, normalizeName, pairVoicePeers, speakingExpired, VOICE_ENTER_RANGE, type VoiceEdge } from "@game/shared/social";
 
 type Inbox = { inputs: InputMessage[]; lastSeq: number; windowStart: number; count: number };
 type Social = { enabled: boolean; activeAt: number; limits: Map<string, { tokens: number; at: number }>; peers: string };
 
 export class GameRoom extends Room<GameState> {
   maxClients = 32;
+  // ponytail: Bell paused; keep the prototype available for isolated tests.
+  protected bellEnabled = false;
   private inboxes = new Map<string, Inbox>();
   private social = new Map<string, Social>();
   private edges: VoiceEdge[] = [];
@@ -43,6 +45,7 @@ export class GameRoom extends Room<GameState> {
   }
 
   private tickBell(now: number) {
+    if (!this.bellEnabled) return;
     const previous = this.state.bell.phase;
     if (advanceBell(this.state.bell, now)) {
       for (const player of this.state.players.values()) {
@@ -56,20 +59,22 @@ export class GameRoom extends Room<GameState> {
 
   onCreate() {
     this.state = new GameState();
-    this.state.bell.updatedAt = Date.now();
-    this.state.bell.endsAt = Date.now() + BELL_WAIT_MS;
-    const spots: { x: number; z: number }[] = [];
-    for (let i = 0; i < 4; i++) {
-      const spot = findSpawn(spots, i, 6);
-      spots.push(spot);
-      const lantern = new LanternState();
-      lantern.id = `lantern-${i + 1}`;
-      lantern.x = spot.x;
-      lantern.z = spot.z;
-      this.state.bell.lanterns.push(lantern);
+    if (this.bellEnabled) {
+      this.state.bell.updatedAt = Date.now();
+      this.state.bell.endsAt = Date.now() + BELL_WAIT_MS;
+      const spots: { x: number; z: number }[] = [];
+      for (let i = 0; i < 4; i++) {
+        const spot = findSpawn(spots, i, 6);
+        spots.push(spot);
+        const lantern = new LanternState();
+        lantern.id = `lantern-${i + 1}`;
+        lantern.x = spot.x;
+        lantern.z = spot.z;
+        this.state.bell.lanterns.push(lantern);
+      }
     }
     this.onMessage("light-lantern", (client, value: unknown) => {
-      if (typeof value !== "string" || value.length > 32 || !this.allow(client.sessionId, "lantern", 4, 4)) return;
+      if (!this.bellEnabled || typeof value !== "string" || value.length > 32 || !this.allow(client.sessionId, "lantern", 4, 4)) return;
       const player = this.state.players.get(client.sessionId);
       const lantern = this.state.bell.lanterns.find(l => l.id === value);
       const now = Date.now();
@@ -87,6 +92,16 @@ export class GameRoom extends Room<GameState> {
       if (!this.allow(client.sessionId, "recolor", 1, 1)) return;
       const player = this.state.players.get(client.sessionId);
       if (player) player.color = normalizeColor(value);
+    });
+    this.onMessage("character", (client, value: unknown) => {
+      if (!isCharacter(value)) return;
+      const player = this.state.players.get(client.sessionId);
+      if (!player || player.character === value) return;
+      if (!this.allow(client.sessionId, "character", 1, 1)) {
+        client.send("character-error", "Character changed too frequently. Wait a moment, then try again.");
+        return;
+      }
+      player.character = value;
     });
     this.onMessage("voice-enabled", (client, value: unknown) => {
       const social = this.social.get(client.sessionId), player = this.state.players.get(client.sessionId);
@@ -153,6 +168,7 @@ export class GameRoom extends Room<GameState> {
     const player = new Player();
     player.name = normalizeName(isRecord(options) ? options.name : undefined);
     player.color = normalizeColor(isRecord(options) ? options.color : undefined);
+    if (isRecord(options) && isCharacter(options.character)) player.character = options.character;
     try {
       const spawn = findSpawn([...this.state.players.values()]);
       player.x = spawn.x;

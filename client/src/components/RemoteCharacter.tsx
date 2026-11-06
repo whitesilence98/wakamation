@@ -27,13 +27,10 @@ export function RemoteCharacter({ id }: { id: string }) {
       initialized.current = true;
     } else {
       group.current.position.lerp(target.current, alpha);
-      // Vertical is not lerped: the jump arc is ~150 u/s, so a 12/s gain would put
-      // the remote avatar a dozen units off the authoritative height.
-      group.current.position.y = target.current.y;
       const delta = Math.atan2(Math.sin(state.rotation - group.current.rotation.y), Math.cos(state.rotation - group.current.rotation.y));
       group.current.rotation.y += delta * alpha;
     }
     animation.current = state.currentAnimation;
   });
-  return <group ref={group}><Character animation={animation} tint={hueForColor(profiles.get(id)?.color, id)} /><PlayerLabel id={id} /></group>;
+  return <group ref={group}><Character character={profiles.get(id)?.character} animation={animation} tint={hueForColor(profiles.get(id)?.color, id)} /><PlayerLabel id={id} /></group>;
 }

@@ -32,7 +32,7 @@ export function LocalCharacter({ cameraTarget, onReady }: { cameraTarget: Mutabl
   useEffect(() => {
     const down = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
-      if (target?.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target?.tagName ?? "")) return;
+      if (document.querySelector("dialog[open]") || target?.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target?.tagName ?? "")) return;
       // A focused control already owns Space (talk button, voice switch): let it act.
       const owner = target instanceof Element ? target.closest("button, [role='switch'], [role='button'], a[href]") : null;
       if (event.code === "Space" && owner) return;
@@ -46,7 +46,7 @@ export function LocalCharacter({ cameraTarget, onReady }: { cameraTarget: Mutabl
     const clear = () => { keys.current.clear(); accumulator.current = 0; jumpQueued.current = false; };
     const focus = (event: FocusEvent) => {
       const target = event.target as HTMLElement | null;
-      if (target?.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target?.tagName ?? "")) clear();
+      if (document.querySelector("dialog[open]") || target?.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target?.tagName ?? "")) clear();
     };
     document.addEventListener("focusin", focus);
     window.addEventListener("keydown", down);
@@ -107,12 +107,7 @@ export function LocalCharacter({ cameraTarget, onReady }: { cameraTarget: Mutabl
       const alpha = 1 - Math.exp(-25 * delta);
       target.current.set(player.x, player.y, player.z);
       if (visual.current.position.distanceToSquared(target.current) > RENDER_SNAP_DISTANCE ** 2) visual.current.position.copy(target.current);
-      else {
-        visual.current.position.lerp(target.current, alpha);
-        // Height is predicted locally and the jump is a ~150 u/s arc, which a
-        // 25/s smoothing would trail by units. Follow it exactly instead.
-        visual.current.position.y = target.current.y;
-      }
+      else visual.current.position.lerp(target.current, alpha);
       const yawDelta = Math.atan2(Math.sin(player.rotation - visual.current.rotation.y), Math.cos(player.rotation - visual.current.rotation.y));
       visual.current.rotation.y += yawDelta * alpha;
       cameraTarget.current.copy(visual.current.position);
@@ -124,6 +119,6 @@ export function LocalCharacter({ cameraTarget, onReady }: { cameraTarget: Mutabl
     <RigidBody ref={body} type="kinematicPosition" colliders={false} enabledRotations={[false, false, false]}>
       <CapsuleCollider args={[0.55, 0.35]} position={[0, 0.9, 0]} sensor />
     </RigidBody>
-    <group ref={visual}><Character animation={animation} local onReady={onReady} tint={sessionId ? hueForColor(profiles.get(sessionId)?.color, sessionId) : undefined} />{sessionId && <PlayerLabel id={sessionId} />}</group>
+    <group ref={visual}><Character character={sessionId ? profiles.get(sessionId)?.character : undefined} animation={animation} local onReady={onReady} tint={sessionId ? hueForColor(profiles.get(sessionId)?.color, sessionId) : undefined} />{sessionId && <PlayerLabel id={sessionId} />}</group>
   </>;
 }

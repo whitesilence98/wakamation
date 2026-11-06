@@ -1,15 +1,9 @@
 import { COLLISION_BITS, GRID_CELL, GRID_HALF, GRID_SIZE } from "./collision-data.js";
+import { FOREST_GROUND_Y as GROUND_Y } from "./forest.js";
+export { GROUND_Y };
 
 export const PLAYER_RADIUS = 0.35;
-// The map is a child's bedroom seen from toy scale, and the arena is the top of
-// the giant checkerboard board the toys stand on. The room floor is MAP_FLOOR_Y
-// in the asset, which the renderer lifts to y = 0, so the board is ~91 units up:
-// players walk on the board, not the floor. Measured from map.cropped.glb, the
-// board arches from 87.8 at its edges to 91.1 at its centre; GROUND_Y is its
-// height at the spawn point. A single constant is exact only while movement
-// stays flat — the arch itself is not modelled.
-export const GROUND_Y = 91.1;
-const bits = Uint8Array.from(atob(COLLISION_BITS), char => char.charCodeAt(0));
+const bits = COLLISION_BITS;
 const cell = (value: number) => Math.floor((value + GRID_HALF) / GRID_CELL);
 const edge = (index: number) => index * GRID_CELL - GRID_HALF;
 const blocked = (x: number, z: number) => x < 0 || z < 0 || x >= GRID_SIZE || z >= GRID_SIZE
@@ -54,7 +48,7 @@ export function resolveMove(x: number, z: number, dx: number, dz: number): { x: 
   return canStand(nextX, nextZ) ? { x: nextX, z: nextZ } : { x, z };
 }
 
-// Spawns are on the board's surface, so the returned y is GROUND_Y rather than 0.
+// Spawns search outward from the forest clearing, returning the shared ground height.
 export function findSpawn(taken: readonly { x: number; z: number }[], index = taken.length, spacing = 1.2): { x: number; y: number; z: number } {
   for (let radius = 0; radius <= GRID_HALF - PLAYER_RADIUS; radius += 0.25) {
     const samples = Math.max(1, Math.ceil(2 * Math.PI * radius / 0.25));

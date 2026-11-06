@@ -86,15 +86,15 @@ p { margin: 0; line-height: 1.5; font-size: 14px; }
 .section-label { margin: 0 0 10px; color: #c4d8e6; }
 .hud-form { margin-top: 16px; }
 .field { position: relative; margin-top: 7px; }
-.field input {
+.field input, .field select {
   width: 100%; padding: 11px 40px 11px 12px;
   font: inherit; font-size: 14px; color: var(--text);
   background: var(--field); border: 1px solid var(--border); border-radius: 12px;
   transition: border-color 140ms ease, background 140ms ease;
 }
-.field input:hover { border-color: var(--border-strong); }
-.field input:focus { outline: none; border-color: rgba(74, 222, 128, .55); background: rgba(5, 14, 23, .78); }
-.field input:disabled { opacity: .55; }
+.field input:hover, .field select:hover { border-color: var(--border-strong); }
+.field input:focus, .field select:focus { outline: none; border-color: rgba(74, 222, 128, .55); background: rgba(5, 14, 23, .78); }
+.field input:disabled, .field select:disabled { opacity: .55; }
 .field-icon {
   position: absolute; top: 50%; right: 12px; width: 18px; height: 18px;
   transform: translateY(-50%); color: var(--muted); pointer-events: none;
@@ -251,14 +251,48 @@ p { margin: 0; line-height: 1.5; font-size: 14px; }
 }
 .speaking-icon { width: 14px; height: 14px; color: var(--accent); }
 
+/* ── Graphics settings ───────────────────────────────────────────────────── */
+.settings-button { pointer-events: auto; cursor: pointer; font: inherit; }
+.settings-button:hover { color: var(--text); border-color: var(--accent); }
+.settings-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.graphics-dialog {
+  width: min(400px, calc(100vw - 32px)); max-height: calc(100dvh - 32px);
+  padding: 22px; overflow-y: auto; overscroll-behavior: contain;
+  color: var(--text); background: #0c1926;
+  border: 1px solid var(--border-strong); border-radius: var(--radius);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, .5);
+}
+.graphics-dialog::backdrop { background: rgba(0, 0, 0, .55); }
+.graphics-header, .graphics-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.graphics-header h2 { margin: 0; font-size: 18px; }
+.graphics-control { display: flex; flex-direction: column; gap: 9px; margin-top: 20px; font-size: 13px; }
+.graphics-control > span { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.graphics-control output, .graphics-control small { font-size: 11px; color: var(--muted); }
+.graphics-control small { display: block; line-height: 1.5; }
+.graphics-control select {
+  width: 100%; padding: 10px; color: var(--text); background: var(--field);
+  border: 1px solid var(--border-strong); border-radius: 8px; font: inherit;
+}
+.graphics-control input { accent-color: var(--accent); }
+.graphics-control input[type="range"] { width: 100%; margin: 3px 0; }
+.graphics-control input:focus-visible, .graphics-control select:focus-visible, .graphics-dialog button:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 3px;
+}
+.graphics-checkbox { flex-direction: row; align-items: center; justify-content: space-between; }
+.graphics-checkbox > span { display: block; }
+.graphics-checkbox input { width: 20px; height: 20px; }
+.graphics-footer { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--border); }
+.graphics-footer .small { margin: 0; }
+
 /* ── Responsive / motion ──────────────────────────────────────────────────── */
 @media (max-height: 720px) {
   .hud { padding: 13px 14px 12px; }
   .hud-section { margin-top: 11px; padding-top: 11px; }
-  .field input { padding-top: 9px; padding-bottom: 9px; }
+  .field input, .field select { padding-top: 9px; padding-bottom: 9px; }
 }
 @media (max-width: 640px) {
-  .hud-actions { display: none; }
+  .decorative-action { display: none; }
+  .hud { width: min(332px, calc(100% - 80px)); }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }

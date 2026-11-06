@@ -4,11 +4,11 @@ import { Client, type Room } from "colyseus.js";
 import type { GameState } from "@game/shared";
 import type { BellPhase, Lantern } from "@game/shared/bell";
 import type { InputMessage, PlayerSnapshot } from "@game/shared/movement";
-import { DEFAULT_COLOR, DEFAULT_NAME, normalizeColor, normalizeName } from "@game/shared/social";
+import { DEFAULT_CHARACTER, DEFAULT_COLOR, DEFAULT_NAME, isCharacter, normalizeColor, normalizeName, type CharacterId } from "@game/shared/social";
 import { createContext, useContext, useEffect, useRef, useState, type MutableRefObject, type ReactNode } from "react";
 
 type ConnectionStatus = "connecting" | "connected" | "reconnecting";
-type Profile = { name: string; color: string; speaking: boolean; embers: number; lanternsLit: number };
+type Profile = { name: string; color: string; character: CharacterId; speaking: boolean; embers: number; lanternsLit: number };
 type BellSnapshot = { phase: BellPhase; endsAt: number; serverNow: number; receivedAt: number; charge: number; won: boolean; lanterns: Lantern[] };
 type Network = {
   bell: BellSnapshot | null;
@@ -17,6 +17,8 @@ type Network = {
   profiles: Map<string, Profile>;
   rename: (name: string) => boolean;
   recolor: (color: string) => boolean;
+  selectCharacter: (character: CharacterId) => boolean;
+  characterError: string | null;
   room: MutableRefObject<Room<GameState> | null>;
   snapshots: MutableRefObject<Map<string, PlayerSnapshot>>;
   revision: MutableRefObject<number>;
@@ -35,6 +37,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const [profiles, setProfiles] = useState(new Map<string, Profile>());
   const chosenName = useRef(DEFAULT_NAME);
   const chosenColor = useRef(DEFAULT_COLOR);
+  const chosenCharacter = useRef<CharacterId>(DEFAULT_CHARACTER);
+  const [characterError, setCharacterError] = useState<string | null>(null);
   const snapshots = useRef(new Map<string, PlayerSnapshot>());
   const revision = useRef(0);
   const [playerIds, setPlayerIds] = useState<string[]>([]);
@@ -58,6 +62,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       setActiveRoom(null);
       setBell(null);
       setProfiles(new Map());
+      setCharacterError(null);
       snapshots.current.clear();
       revision.current++;
       setPlayerIds([]);
@@ -65,7 +70,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     };
     const connect = async () => {
       try {
-        const joined = await client.joinOrCreate<GameState>("game", { name: chosenName.current, color: chosenColor.current });
+        const joined = await client.joinOrCreate<GameState>("game", { name: chosenName.current, color: chosenColor.current, character: chosenCharacter.current });
         if (disposed) { void joined.leave(); return; }
         room.current = joined;
         setActiveRoom(joined);
@@ -85,16 +90,21 @@ export function GameProvider({ children }: { children: ReactNode }) {
             currentAnimation: p.currentAnimation, lastProcessedSeq: p.lastProcessedSeq,
           }));
           const metadata = new Map<string, Profile>();
-          state.players.forEach((p, id) => metadata.set(id, { name: p.name || DEFAULT_NAME, color: normalizeColor(p.color), speaking: p.speaking === true, embers: p.embers, lanternsLit: p.lanternsLit }));
+          state.players.forEach((p, id) => metadata.set(id, { name: p.name || DEFAULT_NAME, color: normalizeColor(p.color), character: isCharacter(p.character) ? p.character : DEFAULT_CHARACTER, speaking: p.speaking === true, embers: p.embers, lanternsLit: p.lanternsLit }));
+          const ownProfile = metadata.get(joined.sessionId);
+          if (ownProfile) chosenCharacter.current = ownProfile.character;
           setProfiles(previous => previous.size === metadata.size && [...metadata].every(([id, p]) => {
             const old = previous.get(id);
-            return old?.name === p.name && old.color === p.color && old.speaking === p.speaking
+            return old?.name === p.name && old.color === p.color && old.character === p.character && old.speaking === p.speaking
               && old.embers === p.embers && old.lanternsLit === p.lanternsLit;
           }) ? previous : metadata);
           snapshots.current = next;
           revision.current++;
           const ids = [...next.keys()];
           setPlayerIds(previous => previous.length === ids.length && previous.every((id, i) => id === ids[i]) ? previous : ids);
+        });
+        joined.onMessage("character-error", (message: unknown) => {
+          if (!disposed && room.current === joined && typeof message === "string") setCharacterError(message);
         });
         joined.onError((code, message) => {
           if (!disposed && room.current === joined) setError(`${code}: ${message ?? "Connection error"}`);
@@ -142,10 +152,17 @@ export function GameProvider({ children }: { children: ReactNode }) {
     active.send("recolor", chosenColor.current);
     return true;
   };
+  const selectCharacter = (character: CharacterId) => {
+    const active = room.current;
+    if (!active?.connection.isOpen || !isCharacter(character)) return false;
+    setCharacterError(null);
+    active.send("character", character);
+    return true;
+  };
   const lightLantern = (id: string) => {
     if (room.current?.connection.isOpen) room.current.send("light-lantern", id);
   };
-  return <GameContext.Provider value={{ bell, lightLantern, activeRoom, profiles, rename, recolor, room, snapshots, revision, playerIds, sessionId, status, error, sendInput }}>{children}</GameContext.Provider>;
+  return <GameContext.Provider value={{ bell, lightLantern, activeRoom, profiles, rename, recolor, selectCharacter, characterError, room, snapshots, revision, playerIds, sessionId, status, error, sendInput }}>{children}</GameContext.Provider>;
 }
 
 export function useGame() {

@@ -1,10 +1,45 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { AIR_TIME, canStand, findSpawn, GROUND_Y, isInput, JUMP_HEIGHT, reconcile, resolveMove, stepPlayer, stepVertical, RUN_SPEED, TICK_DT, WALK_SPEED, WORLD_LIMIT, type PlayerSnapshot } from "@game/shared/movement";
+import { CLEARING_RADIUS, createForest, FOREST_ASSETS, FOREST_OBSTACLES, FOREST_PATHS, FOREST_PLACEMENTS } from "@game/shared/forest";
 
-// Players stand on the board at GROUND_Y, not on the room floor at y = 0.
+// Prediction and the server share the flat forest floor.
 const player = (): PlayerSnapshot => ({ ...findSpawn([]), y: GROUND_Y, vy: 0, rotation: 0, currentAnimation: "Idle", lastProcessedSeq: 0 });
 const input = { seq: 1, forward: 1, right: 0, run: false };
+test("forest layout is deterministic and its solid props match collision", () => {
+  assert.equal(GROUND_Y, 0);
+  assert.equal(WORLD_LIMIT, 40);
+  assert.deepEqual(createForest(), FOREST_PLACEMENTS);
+  assert.ok(FOREST_PLACEMENTS.length > 300 && FOREST_PLACEMENTS.length < 6000);
+  const solids = FOREST_OBSTACLES.filter(p => Math.abs(p.x) < 38 && Math.abs(p.z) < 38);
+  assert.ok(solids.some(p => p.kind === "Rock_Medium_1"));
+  assert.ok(solids.some(p => p.kind === "Pine_1"));
+  for (const p of solids) assert.equal(canStand(p.x, p.z), false, `${p.kind} must block its center`);
+  assert.ok(FOREST_PLACEMENTS.some(p => !FOREST_ASSETS[p.kind].blocking && canStand(p.x, p.z)), "small foliage is walkable");
+  const obstacle = solids.find(p => canStand(p.x - p.radius - 2, p.z));
+  assert.ok(obstacle);
+  const start = obstacle.x - obstacle.radius - 2;
+  const end = resolveMove(start, obstacle.z, obstacle.radius * 2 + 4, 0);
+  assert.ok(end.x < obstacle.x && canStand(end.x, end.z), "sweep cannot tunnel through a trunk/rock");
+});
+test("forest clearing and connected path corridors stay walkable", () => {
+  for (let z = -CLEARING_RADIUS; z <= CLEARING_RADIUS; z += 0.5) {
+    for (let x = -CLEARING_RADIUS; x <= CLEARING_RADIUS; x += 0.5) {
+      if (Math.hypot(x, z) <= CLEARING_RADIUS) assert.ok(canStand(x, z));
+    }
+  }
+  for (const path of FOREST_PATHS) for (let i = 1; i < path.length; i++) {
+    const a = path[i - 1]!, b = path[i]!, length = Math.hypot(b.x - a.x, b.z - a.z);
+    const steps = Math.ceil(length / 0.2);
+    for (let step = 0; step <= steps; step++) {
+      const t = step / steps;
+      for (const offset of [-1, 0, 1]) {
+        assert.ok(canStand(a.x + (b.x - a.x) * t - (b.z - a.z) / length * offset,
+          a.z + (b.z - a.z) * t + (b.x - a.x) / length * offset), "path corridor must stay clear");
+      }
+    }
+  }
+});
 test("walking and running respect normalized speed limits and collision", () => {
   for (const run of [false, true]) {
     const p = player(), start = { ...p };
@@ -27,7 +62,7 @@ test("idle, swept bounds and invalid starting positions", () => {
   stepPlayer(p, { ...input, forward: 0 });
   assert.equal(p.currentAnimation, "Idle");
 });
-test("room spawns are clear, separated, and on the board surface", () => {
+test("room spawns are clear, separated, and on the forest floor", () => {
   const taken: { x: number; z: number }[] = [];
   for (let i = 0; i < 32; i++) {
     const spawn = findSpawn(taken);
@@ -38,6 +73,8 @@ test("room spawns are clear, separated, and on the board surface", () => {
   }
 });
 test("jumping reaches the tuned apex, lands, and is ignored mid-air", () => {
+  assert.ok(JUMP_HEIGHT >= 0.5 && JUMP_HEIGHT <= 1, "normal hop, below avatar height");
+  assert.ok(AIR_TIME >= 0.5 && AIR_TIME <= 0.7, "short, responsive airtime");
   const p = player();
   stepPlayer(p, { ...input, forward: 0, jump: true });
   assert.ok(p.y > GROUND_Y && p.currentAnimation === "Jump");
@@ -54,7 +91,7 @@ test("jumping reaches the tuned apex, lands, and is ignored mid-air", () => {
     apex = Math.max(apex, p.y);
     assert.equal(p.currentAnimation, "Jump");
   }
-  // The apex is measured above the board, not above the room floor.
+  // The apex is measured above the shared forest floor.
   assert.ok(Math.abs(apex - GROUND_Y - JUMP_HEIGHT) < 1e-6, `apex ${apex - GROUND_Y} should be ${JUMP_HEIGHT}`);
   // Landing happens on a tick boundary, which is what AIR_TIME encodes.
   assert.ok(Math.abs(ticks * TICK_DT - AIR_TIME) < 1e-9);
