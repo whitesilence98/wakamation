@@ -2,6 +2,8 @@ export const FOREST_HALF = 40;
 export const FOREST_GROUND_Y = 0;
 export const CLEARING_RADIUS = 8;
 export const PATH_HALF_WIDTH = 1.6;
+// Scaled bounds of house.glb; update dimensions when replacing the model.
+export const HOUSE = { x: 0, z: 14, width: 4.887207634663656, depth: 10 } as const;
 
 type Point = { x: number; z: number };
 export type ForestKind = "CommonTree_1" | "CommonTree_3" | "Pine_1" | "Bush_Common" | "Rock_Medium_1" | "Grass_Common_Short" | "Fern_1" | "Flower_3_Group";
@@ -61,7 +63,11 @@ export function createForest(): ForestPlacement[] {
   for (const [kind, attempts] of [["Bush_Common", 300], ["Fern_1", 260], ["Grass_Common_Short", 3600], ["Flower_3_Group", 320]] as const) {
     for (let i = 0; i < attempts; i++) add(kind, (random() - 0.5) * 88, (random() - 0.5) * 88, 0.7 + random() * 0.6);
   }
-  return placements;
+  // Filter last so reserving the house does not change the seeded RNG sequence.
+  return placements.filter(p => Math.hypot(
+    Math.max(0, Math.abs(p.x - HOUSE.x) - HOUSE.width / 2),
+    Math.max(0, Math.abs(p.z - HOUSE.z) - HOUSE.depth / 2),
+  ) >= p.radius + 1.2);
 }
 
 export const FOREST_PLACEMENTS = createForest();

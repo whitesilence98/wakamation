@@ -5,6 +5,7 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import { Physics, RigidBody, CuboidCollider } from "@react-three/rapier";
 import { GROUND_Y, WORLD_LIMIT } from "@game/shared/movement";
+import { HOUSE } from "@game/shared/forest";
 import { Box3, DirectionalLight, Vector3 } from "three";
 import { useGame } from "@/network/GameProvider";
 import { LocalCharacter } from "./LocalCharacter";
@@ -17,16 +18,16 @@ function House() {
   const { scene } = useGLTF("/models/house/house.glb");
   const { model, scale, position } = useMemo(() => {
     const model = scene.clone(true);
+    model.rotation.y += Math.PI;
     model.updateMatrixWorld(true);
     const bounds = new Box3().setFromObject(model);
     const size = bounds.getSize(new Vector3());
     const center = bounds.getCenter(new Vector3());
     const width = Math.max(size.x, size.z);
     if (!Number.isFinite(width) || width <= 0 || !Number.isFinite(bounds.min.y)) throw new Error("House has invalid bounds");
-    const scale = 10 / width;
-    return { model, scale, position: [-center.x * scale, GROUND_Y - bounds.min.y * scale, -center.z * scale] as [number, number, number] };
+    const scale = Math.max(HOUSE.width, HOUSE.depth) / width;
+    return { model, scale, position: [HOUSE.x - center.x * scale, GROUND_Y - bounds.min.y * scale, HOUSE.z - center.z * scale] as [number, number, number] };
   }, [scene]);
-  // ponytail: visual-only placement; add shared collision and safe spawns before making it solid.
   return <group scale={scale} position={position}><primitive object={model} dispose={null} /></group>;
 }
 

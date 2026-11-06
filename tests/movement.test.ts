@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { AIR_TIME, canStand, findSpawn, GROUND_Y, isInput, JUMP_HEIGHT, reconcile, resolveMove, stepPlayer, stepVertical, RUN_SPEED, TICK_DT, WALK_SPEED, WORLD_LIMIT, type PlayerSnapshot } from "@game/shared/movement";
-import { CLEARING_RADIUS, createForest, FOREST_ASSETS, FOREST_OBSTACLES, FOREST_PATHS, FOREST_PLACEMENTS } from "@game/shared/forest";
+import { AIR_TIME, canStand, findSpawn, GROUND_Y, isInput, JUMP_HEIGHT, PLAYER_RADIUS, reconcile, resolveMove, stepPlayer, stepVertical, RUN_SPEED, TICK_DT, WALK_SPEED, WORLD_LIMIT, type PlayerSnapshot } from "@game/shared/movement";
+import { CLEARING_RADIUS, createForest, FOREST_ASSETS, FOREST_OBSTACLES, FOREST_PATHS, FOREST_PLACEMENTS, HOUSE } from "@game/shared/forest";
 
 // Prediction and the server share the flat forest floor.
 const player = (): PlayerSnapshot => ({ ...findSpawn([]), y: GROUND_Y, vy: 0, rotation: 0, currentAnimation: "Idle", lastProcessedSeq: 0 });
@@ -22,10 +22,45 @@ test("forest layout is deterministic and its solid props match collision", () =>
   const end = resolveMove(start, obstacle.z, obstacle.radius * 2 + 4, 0);
   assert.ok(end.x < obstacle.x && canStand(end.x, end.z), "sweep cannot tunnel through a trunk/rock");
 });
-test("forest clearing and connected path corridors stay walkable", () => {
+test("house footprint blocks swept movement and preserves safe surroundings", () => {
+  const left = Math.floor((HOUSE.x - HOUSE.width / 2) / 0.5) * 0.5;
+  const right = Math.ceil((HOUSE.x + HOUSE.width / 2) / 0.5) * 0.5;
+  const front = HOUSE.z - HOUSE.depth / 2, back = HOUSE.z + HOUSE.depth / 2;
+  assert.equal(canStand(HOUSE.x, HOUSE.z), false);
+  assert.ok(canStand(0, 0), "central spawn stays clear");
+  for (const [x, z, dx, dz] of [
+    [left - 1, HOUSE.z, HOUSE.width + 2, 0],
+    [right + 1, HOUSE.z, -HOUSE.width - 2, 0],
+    [HOUSE.x, front - 1, 0, HOUSE.depth + 2],
+    [HOUSE.x, back + 1, 0, -HOUSE.depth - 2],
+  ]) {
+    assert.ok(canStand(x!, z!), "approach must be walkable");
+    const end = resolveMove(x!, z!, dx!, dz!);
+    assert.ok(canStand(end.x, end.z));
+    if (dx! > 0) assert.ok(end.x <= left - PLAYER_RADIUS);
+    if (dx! < 0) assert.ok(end.x >= right + PLAYER_RADIUS);
+    if (dz! > 0) assert.ok(end.z <= front - PLAYER_RADIUS);
+    if (dz! < 0) assert.ok(end.z >= back + PLAYER_RADIUS);
+  }
+  assert.ok(canStand(HOUSE.x, front - PLAYER_RADIUS - 0.01));
+  assert.equal(canStand(HOUSE.x, front - PLAYER_RADIUS + 0.01), false);
+  assert.ok(canStand(HOUSE.x, back + PLAYER_RADIUS + 0.01), "no extra row beyond back wall");
+  const slide = resolveMove(HOUSE.x, front - 1, 1, 5);
+  assert.ok(slide.x > HOUSE.x + 0.9 && slide.z < front && canStand(slide.x, slide.z));
+  for (const p of FOREST_PLACEMENTS) assert.ok(Math.hypot(
+    Math.max(0, Math.abs(p.x - HOUSE.x) - HOUSE.width / 2),
+    Math.max(0, Math.abs(p.z - HOUSE.z) - HOUSE.depth / 2),
+  ) >= p.radius + 1.2, "vegetation stays outside house reservation");
+});
+test("forest clearing outside the house and connected path corridors stay walkable", () => {
   for (let z = -CLEARING_RADIUS; z <= CLEARING_RADIUS; z += 0.5) {
     for (let x = -CLEARING_RADIUS; x <= CLEARING_RADIUS; x += 0.5) {
-      if (Math.hypot(x, z) <= CLEARING_RADIUS) assert.ok(canStand(x, z));
+      if (Math.hypot(x, z) > CLEARING_RADIUS) continue;
+      const houseDistance = Math.hypot(
+        Math.max(0, Math.floor((HOUSE.x - HOUSE.width / 2) / 0.5) * 0.5 - x, x - Math.ceil((HOUSE.x + HOUSE.width / 2) / 0.5) * 0.5),
+        Math.max(0, HOUSE.z - HOUSE.depth / 2 - z, z - HOUSE.z - HOUSE.depth / 2),
+      );
+      assert.equal(canStand(x, z), houseDistance >= PLAYER_RADIUS, `clearing at ${x}, ${z}`);
     }
   }
   for (const path of FOREST_PATHS) for (let i = 1; i < path.length; i++) {
