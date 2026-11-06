@@ -7,11 +7,11 @@ for (const [name, settings] of Object.entries(GRAPHICS_PRESETS)) {
   assert.deepEqual(normalizeGraphics(settings), settings);
   assert.equal(graphicsPreset(settings), name);
 }
-assert.equal(graphicsPreset(DEFAULT_GRAPHICS), "Balanced");
+assert.equal(graphicsPreset(DEFAULT_GRAPHICS), "Low");
 for (const invalid of [null, undefined, [], 1, "high", { viewDistance: NaN, resolution: "4k", shadows: "false", foliage: 0 }]) {
   assert.deepEqual(normalizeGraphics(invalid), DEFAULT_GRAPHICS);
 }
-assert.equal(normalizeGraphics({ viewDistance: Infinity }).viewDistance, 54);
+assert.equal(normalizeGraphics({ viewDistance: Infinity }).viewDistance, DEFAULT_GRAPHICS.viewDistance);
 assert.equal(normalizeGraphics({ viewDistance: -100 }).viewDistance, 30);
 assert.equal(normalizeGraphics({ viewDistance: 1000 }).viewDistance, 80);
 assert.equal(normalizeGraphics({ shadows: false }).shadows, false);

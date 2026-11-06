@@ -96,12 +96,12 @@ The panel collapses from the chevron in its header; the choice is remembered for
 
 ## Graphics settings
 
-Changes apply immediately, without reconnecting. Preferences are saved in this browser's local storage when available; Reset defaults restores Balanced. Opening the dialog releases movement and push-to-talk; Escape or Close returns to the game.
+Changes apply immediately, without reconnecting. Preferences are saved in this browser's local storage when available; Reset defaults restores Low. Opening the dialog releases movement and push-to-talk; Escape or Close returns to the game.
 
 | Preset | View distance | Resolution | Avatar shadows | Decorative foliage |
 | --- | --- | --- | --- | --- |
-| Low | 30 units | Performance (0.75× DPR) | Off | 25% |
-| Balanced (default) | 54 units | Standard (1× DPR) | On | 100% |
+| Low (default) | 30 units | Performance (0.75× DPR) | Off | 25% |
+| Balanced | 54 units | Standard (1× DPR) | On | 100% |
 | High | 80 units | HD (device DPR, capped at 2×) | On | 100% |
 
 Individual controls allow a Custom combination. View distance adjusts fog and camera clipping, not playable bounds. HD increases render pixels, not texture quality; on a 1× display it matches Standard. Foliage density affects only decorative bushes, grass, flowers and ferns; blocking trees, rocks and authoritative collision remain unchanged. Vegetation shadows stay disabled; avatar shadows use a 1024² map. Higher settings cost GPU time; frame-rate improvement is not measured.

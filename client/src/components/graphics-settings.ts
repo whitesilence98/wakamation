@@ -12,7 +12,7 @@ export const GRAPHICS_PRESETS = {
   Balanced: { viewDistance: 54, resolution: "standard", shadows: true, foliage: 100 },
   High: { viewDistance: 80, resolution: "hd", shadows: true, foliage: 100 },
 } as const satisfies Record<string, GraphicsSettings>;
-export const DEFAULT_GRAPHICS: GraphicsSettings = { ...GRAPHICS_PRESETS.Balanced };
+export const DEFAULT_GRAPHICS: GraphicsSettings = { ...GRAPHICS_PRESETS.Low };
 
 export function normalizeGraphics(value: unknown): GraphicsSettings {
   const defaults = { ...DEFAULT_GRAPHICS };
