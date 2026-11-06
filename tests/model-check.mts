@@ -41,9 +41,9 @@ model.updateMatrixWorld(true);
 const actual = new Box3().setFromObject(model).getSize(new Vector3()).y;
 assert.ok(Math.abs(actual - CHARACTER_HEIGHT) < 0.01, `Expected ${CHARACTER_HEIGHT}-unit character; got ${actual}`);
 
-const clips = locomotionClips(gltf.animations, run.animations);
+const clips = locomotionClips(gltf.animations, run.animations, "axolot");
 assert.deepEqual(clips.map(clip => clip.name), ["Idle", "Walk", "Run", "Jump"]);
-assert.deepEqual(locomotionClips(gltf.animations).map(clip => clip.name), ["Idle", "Walk", "Jump"]);
+assert.deepEqual(locomotionClips(gltf.animations, [], "axolot").map(clip => clip.name), ["Idle", "Walk", "Jump"]);
 const bones: import("three").Bone[] = [];
 model.traverse(object => { if (object.type === "Bone") bones.push(object as import("three").Bone); });
 const pose = () => bones.flatMap(bone => [...bone.position.toArray(), ...bone.quaternion.toArray()]);

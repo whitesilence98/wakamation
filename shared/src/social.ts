@@ -1,6 +1,6 @@
 export const CHARACTER_IDS = ["axolot", "gawr"] as const;
 export type CharacterId = typeof CHARACTER_IDS[number];
-export const DEFAULT_CHARACTER: CharacterId = "axolot";
+export const DEFAULT_CHARACTER: CharacterId = "gawr";
 export const isCharacter = (value: unknown): value is CharacterId => value === "axolot" || value === "gawr";
 
 export const DEFAULT_COLOR = "";

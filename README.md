@@ -122,7 +122,7 @@ A small social validation check is available as `npx tsx tests/social-check.mts`
 
 ## Model
 
-Choose **Axolot** or **Gawr** under Customization → Character. Axolot is the initial default. The server validates and synchronizes selections; the selector and avatar reflect confirmed state. Changes are limited to once per second; a rejected rapid change displays a retry hint. The last confirmed selection survives automatic reconnects within this page, not reloads. Name, hue, position and movement remain unchanged when switching. Restart client/server together after this schema update.
+Choose **Axolot** or **Gawr** under Customization → Character. Gawr is the initial default. The server validates and synchronizes selections; the selector and avatar reflect confirmed state. Changes are limited to once per second; a rejected rapid change displays a retry hint. The last confirmed selection survives automatic reconnects within this page, not reloads. Name, hue, position and movement remain unchanged when switching. Restart client/server together after this schema update.
 
 Character assets are grouped under `client/public/models/characters/axolot/` and `client/public/models/characters/gawr/`; the axolot mesh/rig itself is unchanged.
 

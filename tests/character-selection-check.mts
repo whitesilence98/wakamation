@@ -3,7 +3,7 @@ import { AnimationClip, NumberKeyframeTrack } from "three";
 import { CHARACTER_IDS, DEFAULT_CHARACTER, isCharacter } from "../shared/src/social.ts";
 import { locomotionClips } from "../client/src/components/character-clips.ts";
 
-assert.equal(DEFAULT_CHARACTER, "axolot");
+assert.equal(DEFAULT_CHARACTER, "gawr");
 assert.deepEqual(CHARACTER_IDS, ["axolot", "gawr"]);
 for (const id of CHARACTER_IDS) assert.ok(isCharacter(id));
 for (const value of [null, undefined, {}, [], 1, "", "Gawr", "../gawr", "/models/other.glb"])
